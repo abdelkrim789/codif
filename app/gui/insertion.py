@@ -2,7 +2,6 @@
 import tkinter as tk
 from tkinter import ttk, messagebox
 from datetime import datetime
-from tkcalendar import DateEntry
 
 
 class InsertionWindow:

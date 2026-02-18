@@ -49,11 +49,7 @@ pip install -r requirements.txt
 
 3. Initialize the database (first time only):
 ```bash
-python3 -c "
-import sys
-sys.path.insert(0, '.')
-exec(open('app/utils/csv_parser.py').read())
-"
+python3 setup.py
 ```
 
 This will:
@@ -61,6 +57,13 @@ This will:
 - Create `data/codification_reference.xlsx` with pre-loaded FROID family data
 - Create `data/rapport_insertions.xlsx` template
 - Set up the default admin account
+
+4. (Optional) Add sample data for testing:
+```bash
+python3 add_sample_data.py
+```
+
+This will add 10 sample repair insertions to test the dashboard and report features.
 
 ## Usage
 
