@@ -146,9 +146,9 @@ def main():
         print("To start the application:")
         print("  python3 main.py")
         print()
-        print("Default credentials:")
-        print("  Username: admin")
-        print("  Password: admin123")
+        print("Default accounts available:")
+        print("  Admin:    username=admin    password=admin123")
+        print("  Inserter: username=inserter password=inserter123")
     else:
         print("❌ Some checks failed. Please fix the issues above.")
         print()
