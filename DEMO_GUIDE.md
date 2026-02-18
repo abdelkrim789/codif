@@ -17,9 +17,9 @@ This guide demonstrates the key features of the SAV Repair Data Management Appli
 │                                     │
 └─────────────────────────────────────┘
 
-Default credentials:
-- Username: admin
-- Password: admin123
+Default accounts available:
+- Admin: username=admin, password=admin123
+- Inserter: username=inserter, password=inserter123
 ```
 
 ### 2. Main Dashboard

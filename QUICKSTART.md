@@ -67,9 +67,15 @@ This will open the login window.
 
 ## First Login
 
-Use these credentials:
+The system comes with two default accounts:
+
+**Admin Account** (full access):
 - **Username**: `admin`
 - **Password**: `admin123`
+
+**Inserter Account** (data entry only):
+- **Username**: `inserter`
+- **Password**: `inserter123`
 
 ## What You'll See
 

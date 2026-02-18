@@ -137,7 +137,9 @@ python3 verify_installation.py
 # 6. Run application
 python3 main.py
 
-# Login: admin / admin123
+# Default Accounts:
+# Admin: admin / admin123
+# Inserter: inserter / inserter123
 ```
 
 ## 📝 Usage Workflow

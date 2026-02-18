@@ -76,9 +76,17 @@ python3 main.py
 
 ### Default Login Credentials
 
+The system comes with two pre-configured accounts:
+
+#### Admin Account
 - **Username**: `admin`
 - **Password**: `admin123`
 - **Role**: Admin
+
+#### Inserter Account
+- **Username**: `inserter`
+- **Password**: `inserter123`
+- **Role**: Inserter
 
 ### User Roles
 

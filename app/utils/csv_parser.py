@@ -186,12 +186,19 @@ def parse_csv_and_populate():
         
         i += 1
     
-    # Add default admin user
+    # Add default users
     data['users'].append({
         'id': 1,
         'username': 'admin',
         'password': 'admin123',
         'role': 'admin'
+    })
+    
+    data['users'].append({
+        'id': 2,
+        'username': 'inserter',
+        'password': 'inserter123',
+        'role': 'inserter'
     })
     
     # Create Excel files
@@ -207,7 +214,7 @@ def parse_csv_and_populate():
     print(f"  - {len(data['pannes'])} pannes")
     print(f"  - {len(data['causes'])} causes")
     print(f"  - {len(data['solutions'])} solutions")
-    print(f"  - {len(data['users'])} users")
+    print(f"  - {len(data['users'])} users (admin + inserter)")
     
     return True
 
