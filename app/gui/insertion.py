@@ -280,11 +280,25 @@ class InsertionWindow:
         self.famille_combo['values'] = familles
     
     def populate_centres(self):
-        """Populate centres dropdown"""
-        centres = [c['centre'] for c in self.ref_data.get('centres', [])]
-        if not centres:
-            centres = ['Centre Principal']  # Default if no centres
-        self.centre_combo['values'] = centres
+        """Populate centres dropdown with both Centres and Agents Agréés"""
+        options = []
+        
+        # Add centres
+        centres = self.ref_data.get('centres', [])
+        for c in centres:
+            options.append(c['centre'])
+        
+        # Add agents agréés (formatted as "Agent: Nom - Wilaya")
+        agents = self.ref_data.get('agents', [])
+        for a in agents:
+            label = f"Agent: {a['nom_prenom']}"
+            if a.get('wilaya'):
+                label += f" - {a['wilaya']}"
+            options.append(label)
+        
+        if not options:
+            options = ['Centre Principal']
+        self.centre_combo['values'] = options
     
     def populate_pdr(self):
         """Populate PDR dropdown"""

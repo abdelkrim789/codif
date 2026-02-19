@@ -125,6 +125,18 @@ class Dashboard:
                 command=self.open_admin_panel
             )
             admin_btn.pack(side="left", padx=5, pady=10)
+            
+            # Archives button (admin only)
+            archives_btn = tk.Button(
+                button_frame,
+                text="📁 Archives",
+                font=("Arial", 11),
+                bg="#607D8B",
+                fg="white",
+                width=12,
+                command=self.open_archives
+            )
+            archives_btn.pack(side="left", padx=5, pady=10)
         
         # Table frame
         table_frame = tk.Frame(self.root)
@@ -224,6 +236,12 @@ class Dashboard:
         """Open admin panel window"""
         admin_window = tk.Toplevel(self.root)
         AdminPanel(admin_window, self.excel_mgr)
+    
+    def open_archives(self):
+        """Open archives viewer window"""
+        from app.gui.archives import ArchivesWindow
+        archives_window = tk.Toplevel(self.root)
+        ArchivesWindow(archives_window, self.excel_mgr)
     
     def export_report(self):
         """Export monthly report"""

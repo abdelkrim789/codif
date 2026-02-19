@@ -39,6 +39,9 @@ Thumbs.db
 # Generated reports (keep only template)
 data/rapport_*.xlsx
 
+# Archives directory (user data, not tracked)
+data/archives/
+
 # Temporary files
 *.tmp
 *.bak
