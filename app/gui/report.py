@@ -1,4 +1,4 @@
-"""Report generation module"""
+"""Module de génération de rapports"""
 from datetime import datetime
 from openpyxl import load_workbook
 from openpyxl.styles import Font, PatternFill, Alignment, Border, Side
@@ -6,19 +6,19 @@ import os
 
 
 class ReportGenerator:
-    """Generate monthly reports"""
+    """Générer des rapports mensuels"""
     
     def __init__(self, excel_mgr):
         self.excel_mgr = excel_mgr
     
     def generate_report(self, centre_name="Centre Principal"):
-        """Generate formatted monthly report"""
+        """Générer un rapport mensuel formaté"""
         try:
             # Load insertions
             insertions = self.excel_mgr.load_insertions()
             
             if not insertions:
-                return False, "No insertions to export"
+                return False, "Aucune insertion à exporter"
             
             # Create report filename
             current_month = datetime.now().strftime("%B_%Y")
@@ -104,7 +104,7 @@ class ReportGenerator:
             wb.save(report_file)
             wb.close()
             
-            return True, f"Report generated successfully: {report_file}"
+            return True, f"Rapport généré avec succès : {report_file}"
         
         except Exception as e:
-            return False, f"Failed to generate report: {str(e)}"
+            return False, f"Échec de la génération du rapport : {str(e)}"

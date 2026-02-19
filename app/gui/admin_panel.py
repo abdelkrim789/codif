@@ -1,39 +1,64 @@
-"""Admin panel for CRUD operations with Excel import, Agents Agréés, and Archives"""
+"""Panneau d'administration avec opérations CRUD, import Excel, Agents Agréés et Archives"""
 import os
 import tkinter as tk
 from tkinter import ttk, messagebox, simpledialog, filedialog
 
 
+COLORS = {
+    'primary': '#1565C0',
+    'primary_dark': '#0D47A1',
+    'success': '#2E7D32',
+    'danger': '#C62828',
+    'warning': '#EF6C00',
+    'bg': '#F5F5F5',
+    'card_bg': '#FFFFFF',
+    'text': '#212121',
+    'text_light': '#757575',
+    'border': '#E0E0E0',
+    'header_bg': '#1565C0',
+    'toolbar_bg': '#FAFAFA',
+    'filter_bg': '#E3F2FD',
+}
+
+
 class AdminPanel:
-    """Admin panel for managing reference data"""
+    """Panneau d'administration pour gérer les données de référence"""
     
     def __init__(self, root, excel_mgr):
         self.root = root
         self.excel_mgr = excel_mgr
         
-        self.root.title("Admin Panel")
-        self.root.geometry("1000x650")
+        self.root.title("Panneau d'Administration")
+        self.root.geometry("1050x700")
+        self.root.configure(bg=COLORS['bg'])
         
-        # Load reference data
         self.ref_data = excel_mgr.load_reference_data()
         
+        self.setup_styles()
         self.create_widgets()
     
+    def setup_styles(self):
+        style = ttk.Style()
+        style.theme_use('clam')
+        style.configure("Treeview", background="white", foreground=COLORS['text'],
+                         rowheight=26, fieldbackground="white", font=("Segoe UI", 9))
+        style.configure("Treeview.Heading", background=COLORS['primary'], foreground="white",
+                         font=("Segoe UI", 9, "bold"), relief="flat")
+        style.map("Treeview.Heading", background=[('active', COLORS['primary_dark'])])
+        style.map("Treeview", background=[('selected', '#1976D2')], foreground=[('selected', 'white')])
+    
     def create_widgets(self):
-        """Create admin panel widgets"""
-        # Title
-        title_label = tk.Label(
-            self.root,
-            text="Administration Panel",
-            font=("Arial", 16, "bold")
-        )
-        title_label.pack(pady=10)
+        # Header
+        header = tk.Frame(self.root, bg=COLORS['header_bg'], height=50)
+        header.pack(fill="x")
+        header.pack_propagate(False)
+        tk.Label(header, text="Panneau d'Administration",
+                 font=("Segoe UI", 15, "bold"), bg=COLORS['header_bg'], fg="white").pack(pady=10)
         
-        # Create notebook (tabs)
+        # Notebook
         notebook = ttk.Notebook(self.root)
-        notebook.pack(fill="both", expand=True, padx=10, pady=10)
+        notebook.pack(fill="both", expand=True, padx=10, pady=8)
         
-        # Create tabs
         self.create_familles_tab(notebook)
         self.create_produits_tab(notebook)
         self.create_models_tab(notebook)
@@ -46,217 +71,165 @@ class AdminPanel:
         self.create_import_tab(notebook)
         self.create_archives_tab(notebook)
         
-        # Buttons
-        button_frame = tk.Frame(self.root)
-        button_frame.pack(pady=10)
-        
-        save_btn = tk.Button(
-            button_frame,
-            text="Save All Changes",
-            font=("Arial", 11, "bold"),
-            bg="#4CAF50",
-            fg="white",
-            width=15,
-            command=self.save_changes
-        )
-        save_btn.pack(side="left", padx=5)
-        
-        close_btn = tk.Button(
-            button_frame,
-            text="Close",
-            font=("Arial", 11),
-            bg="#f44336",
-            fg="white",
-            width=15,
-            command=self.root.destroy
-        )
-        close_btn.pack(side="left", padx=5)
+        # Bottom buttons
+        btn_frame = tk.Frame(self.root, bg=COLORS['bg'])
+        btn_frame.pack(pady=8)
+        btn_opts = {"font": ("Segoe UI", 11, "bold"), "fg": "white", "relief": "flat",
+                    "cursor": "hand2", "width": 20}
+        tk.Button(btn_frame, text="Sauvegarder les modifications", bg=COLORS['success'],
+                  command=self.save_changes, **btn_opts).pack(side="left", padx=5)
+        tk.Button(btn_frame, text="Fermer", bg=COLORS['danger'],
+                  command=self.root.destroy, **btn_opts).pack(side="left", padx=5)
     
-    # ---- Familles Tab ----
-    def create_familles_tab(self, notebook):
-        frame = tk.Frame(notebook)
-        notebook.add(frame, text="Familles")
+    # ---- Helper: create a tab with search + tree ----
+    def _make_tab(self, notebook, title, columns, data_key, data_list, add_cmd, format_row):
+        """Generic tab with search bar and treeview"""
+        frame = tk.Frame(notebook, bg=COLORS['card_bg'])
+        notebook.add(frame, text=title)
         
-        toolbar = tk.Frame(frame)
-        toolbar.pack(fill="x", padx=5, pady=5)
+        toolbar = tk.Frame(frame, bg=COLORS['toolbar_bg'])
+        toolbar.pack(fill="x", padx=5, pady=4)
         
-        tk.Button(toolbar, text="Add", command=self.add_famille).pack(side="left", padx=2)
-        tk.Button(toolbar, text="Delete", command=lambda: self.delete_selected(self.familles_tree, 'familles')).pack(side="left", padx=2)
+        btn_opts = {"font": ("Segoe UI", 9), "relief": "flat", "cursor": "hand2"}
+        tk.Button(toolbar, text="+ Ajouter", bg=COLORS['success'], fg="white",
+                  command=add_cmd, **btn_opts).pack(side="left", padx=3)
         
-        self.familles_tree = ttk.Treeview(frame, columns=('ID', 'Famille'), show='headings')
-        self.familles_tree.heading('ID', text='ID')
-        self.familles_tree.heading('Famille', text='Famille')
-        self.familles_tree.pack(fill="both", expand=True, padx=5, pady=5)
+        tree_ref = [None]  # mutable to store reference
+        tk.Button(toolbar, text="Supprimer", bg=COLORS['danger'], fg="white",
+                  command=lambda: self.delete_selected(tree_ref[0], data_key),
+                  **btn_opts).pack(side="left", padx=3)
         
-        for f in self.ref_data.get('familles', []):
-            self.familles_tree.insert('', 'end', values=(f['id'], f['famille']))
+        # Search
+        tk.Label(toolbar, text="Rechercher :", font=("Segoe UI", 9),
+                 bg=COLORS['toolbar_bg']).pack(side="left", padx=(15, 4))
+        search_var = tk.StringVar()
+        search_entry = tk.Entry(toolbar, textvariable=search_var, width=20,
+                                font=("Segoe UI", 9), relief="solid", bd=1)
+        search_entry.pack(side="left", padx=3)
+        
+        tree = ttk.Treeview(frame, columns=columns, show='headings')
+        for col in columns:
+            tree.heading(col, text=col)
+        tree.pack(fill="both", expand=True, padx=5, pady=5)
+        tree_ref[0] = tree
+        
+        # Populate
+        for item in data_list:
+            tree.insert('', 'end', values=format_row(item))
+        
+        # Search binding
+        def do_search(*args):
+            query = search_var.get().strip().lower()
+            for child in tree.get_children():
+                tree.delete(child)
+            for item in self.ref_data.get(data_key, []):
+                row_text = ' '.join(str(v) for v in format_row(item)).lower()
+                if not query or query in row_text:
+                    tree.insert('', 'end', values=format_row(item))
+        
+        search_var.trace_add("write", do_search)
+        
+        return tree
     
-    # ---- Produits Tab ----
-    def create_produits_tab(self, notebook):
-        frame = tk.Frame(notebook)
-        notebook.add(frame, text="Produits")
-        
-        toolbar = tk.Frame(frame)
-        toolbar.pack(fill="x", padx=5, pady=5)
-        
-        tk.Button(toolbar, text="Add", command=self.add_produit).pack(side="left", padx=2)
-        tk.Button(toolbar, text="Delete", command=lambda: self.delete_selected(self.produits_tree, 'produits')).pack(side="left", padx=2)
-        
-        self.produits_tree = ttk.Treeview(frame, columns=('ID', 'Famille ID', 'Produit'), show='headings')
-        self.produits_tree.heading('ID', text='ID')
-        self.produits_tree.heading('Famille ID', text='Famille ID')
-        self.produits_tree.heading('Produit', text='Produit')
-        self.produits_tree.pack(fill="both", expand=True, padx=5, pady=5)
-        
-        for p in self.ref_data.get('produits', []):
-            self.produits_tree.insert('', 'end', values=(p['id'], p['famille_id'], p['produit']))
+    # ---- Tabs ----
+    def create_familles_tab(self, nb):
+        self.familles_tree = self._make_tab(
+            nb, "Familles", ('ID', 'Famille'), 'familles',
+            self.ref_data.get('familles', []), self.add_famille,
+            lambda f: (f['id'], f['famille']))
     
-    # ---- Models Tab ----
-    def create_models_tab(self, notebook):
-        frame = tk.Frame(notebook)
-        notebook.add(frame, text="Models")
-        
-        toolbar = tk.Frame(frame)
-        toolbar.pack(fill="x", padx=5, pady=5)
-        
-        tk.Button(toolbar, text="Add", command=self.add_model).pack(side="left", padx=2)
-        tk.Button(toolbar, text="Delete", command=lambda: self.delete_selected(self.models_tree, 'models')).pack(side="left", padx=2)
-        
-        self.models_tree = ttk.Treeview(frame, columns=('ID', 'Produit ID', 'Model'), show='headings')
-        self.models_tree.heading('ID', text='ID')
-        self.models_tree.heading('Produit ID', text='Produit ID')
-        self.models_tree.heading('Model', text='Model')
-        self.models_tree.pack(fill="both", expand=True, padx=5, pady=5)
-        
-        for m in self.ref_data.get('models', []):
-            self.models_tree.insert('', 'end', values=(m['id'], m['produit_id'], m['model']))
+    def create_produits_tab(self, nb):
+        self.produits_tree = self._make_tab(
+            nb, "Produits", ('ID', 'ID Famille', 'Produit'), 'produits',
+            self.ref_data.get('produits', []), self.add_produit,
+            lambda p: (p['id'], p['famille_id'], p['produit']))
     
-    # ---- Pannes Tab ----
-    def create_pannes_tab(self, notebook):
-        frame = tk.Frame(notebook)
-        notebook.add(frame, text="Pannes")
-        
-        toolbar = tk.Frame(frame)
-        toolbar.pack(fill="x", padx=5, pady=5)
-        
-        tk.Button(toolbar, text="Add", command=self.add_panne).pack(side="left", padx=2)
-        tk.Button(toolbar, text="Delete", command=lambda: self.delete_selected(self.pannes_tree, 'pannes')).pack(side="left", padx=2)
-        
-        self.pannes_tree = ttk.Treeview(frame, columns=('ID', 'Code', 'Produit ID', 'Panne'), show='headings')
-        self.pannes_tree.heading('ID', text='ID')
-        self.pannes_tree.heading('Code', text='Code')
-        self.pannes_tree.heading('Produit ID', text='Produit ID')
-        self.pannes_tree.heading('Panne', text='Panne')
-        self.pannes_tree.pack(fill="both", expand=True, padx=5, pady=5)
-        
-        for p in self.ref_data.get('pannes', []):
-            self.pannes_tree.insert('', 'end', values=(p['id'], p['code'], p['produit_id'], p['panne']))
+    def create_models_tab(self, nb):
+        self.models_tree = self._make_tab(
+            nb, "Modèles", ('ID', 'ID Produit', 'Modèle'), 'models',
+            self.ref_data.get('models', []), self.add_model,
+            lambda m: (m['id'], m['produit_id'], m['model']))
     
-    # ---- Causes Tab ----
-    def create_causes_tab(self, notebook):
-        frame = tk.Frame(notebook)
-        notebook.add(frame, text="Causes")
-        
-        toolbar = tk.Frame(frame)
-        toolbar.pack(fill="x", padx=5, pady=5)
-        
-        tk.Button(toolbar, text="Add", command=self.add_cause).pack(side="left", padx=2)
-        tk.Button(toolbar, text="Delete", command=lambda: self.delete_selected(self.causes_tree, 'causes')).pack(side="left", padx=2)
-        
-        self.causes_tree = ttk.Treeview(frame, columns=('ID', 'Code', 'Panne ID', 'Cause'), show='headings')
-        self.causes_tree.heading('ID', text='ID')
-        self.causes_tree.heading('Code', text='Code')
-        self.causes_tree.heading('Panne ID', text='Panne ID')
-        self.causes_tree.heading('Cause', text='Cause')
-        self.causes_tree.pack(fill="both", expand=True, padx=5, pady=5)
-        
-        for c in self.ref_data.get('causes', []):
-            self.causes_tree.insert('', 'end', values=(c['id'], c['code'], c['panne_id'], c['cause']))
+    def create_pannes_tab(self, nb):
+        self.pannes_tree = self._make_tab(
+            nb, "Pannes", ('ID', 'Code', 'ID Produit', 'Panne'), 'pannes',
+            self.ref_data.get('pannes', []), self.add_panne,
+            lambda p: (p['id'], p['code'], p['produit_id'], p['panne']))
     
-    # ---- Solutions Tab ----
-    def create_solutions_tab(self, notebook):
-        frame = tk.Frame(notebook)
-        notebook.add(frame, text="Solutions")
-        
-        toolbar = tk.Frame(frame)
-        toolbar.pack(fill="x", padx=5, pady=5)
-        
-        tk.Button(toolbar, text="Add", command=self.add_solution).pack(side="left", padx=2)
-        tk.Button(toolbar, text="Delete", command=lambda: self.delete_selected(self.solutions_tree, 'solutions')).pack(side="left", padx=2)
-        
-        self.solutions_tree = ttk.Treeview(frame, columns=('ID', 'Code', 'Cause ID', 'Solution'), show='headings')
-        self.solutions_tree.heading('ID', text='ID')
-        self.solutions_tree.heading('Code', text='Code')
-        self.solutions_tree.heading('Cause ID', text='Cause ID')
-        self.solutions_tree.heading('Solution', text='Solution')
-        self.solutions_tree.pack(fill="both", expand=True, padx=5, pady=5)
-        
-        for s in self.ref_data.get('solutions', []):
-            self.solutions_tree.insert('', 'end', values=(s['id'], s['code'], s['cause_id'], s['solution']))
+    def create_causes_tab(self, nb):
+        self.causes_tree = self._make_tab(
+            nb, "Causes", ('ID', 'Code', 'ID Panne', 'Cause'), 'causes',
+            self.ref_data.get('causes', []), self.add_cause,
+            lambda c: (c['id'], c['code'], c['panne_id'], c['cause']))
     
-    # ---- Centres Tab ----
-    def create_centres_tab(self, notebook):
-        frame = tk.Frame(notebook)
-        notebook.add(frame, text="Centres")
-        
-        toolbar = tk.Frame(frame)
-        toolbar.pack(fill="x", padx=5, pady=5)
-        
-        tk.Button(toolbar, text="Add Centre", command=self.add_centre).pack(side="left", padx=2)
-        tk.Button(toolbar, text="Delete", command=lambda: self.delete_selected(self.centres_tree, 'centres')).pack(side="left", padx=2)
-        
-        self.centres_tree = ttk.Treeview(frame, columns=('ID', 'Centre'), show='headings')
-        self.centres_tree.heading('ID', text='ID')
-        self.centres_tree.heading('Centre', text='Centre')
-        self.centres_tree.pack(fill="both", expand=True, padx=5, pady=5)
-        
-        for c in self.ref_data.get('centres', []):
-            self.centres_tree.insert('', 'end', values=(c['id'], c['centre']))
+    def create_solutions_tab(self, nb):
+        self.solutions_tree = self._make_tab(
+            nb, "Solutions", ('ID', 'Code', 'ID Cause', 'Solution'), 'solutions',
+            self.ref_data.get('solutions', []), self.add_solution,
+            lambda s: (s['id'], s['code'], s['cause_id'], s['solution']))
     
-    # ---- Agents Agréés Tab ----
+    def create_centres_tab(self, nb):
+        self.centres_tree = self._make_tab(
+            nb, "Centres", ('ID', 'Centre'), 'centres',
+            self.ref_data.get('centres', []), self.add_centre,
+            lambda c: (c['id'], c['centre']))
+    
+    # ---- Agents Agréés Tab (custom) ----
     def create_agents_tab(self, notebook):
-        """Create agents agréés management tab with full input fields"""
-        frame = tk.Frame(notebook)
+        frame = tk.Frame(notebook, bg=COLORS['card_bg'])
         notebook.add(frame, text="Agents Agréés")
         
-        toolbar = tk.Frame(frame)
-        toolbar.pack(fill="x", padx=5, pady=5)
+        toolbar = tk.Frame(frame, bg=COLORS['toolbar_bg'])
+        toolbar.pack(fill="x", padx=5, pady=4)
         
-        tk.Button(toolbar, text="Add Agent", command=self.add_agent).pack(side="left", padx=2)
-        tk.Button(toolbar, text="Import Agents from Excel",
-                  command=self.import_agents_excel).pack(side="left", padx=2)
-        tk.Button(toolbar, text="Delete",
-                  command=lambda: self.delete_selected(self.agents_tree, 'agents')).pack(side="left", padx=2)
+        btn_opts = {"font": ("Segoe UI", 9), "relief": "flat", "cursor": "hand2"}
+        tk.Button(toolbar, text="+ Ajouter Agent", bg=COLORS['success'], fg="white",
+                  command=self.add_agent, **btn_opts).pack(side="left", padx=3)
+        tk.Button(toolbar, text="Importer Agents (Excel)", bg=COLORS['warning'], fg="white",
+                  command=self.import_agents_excel, **btn_opts).pack(side="left", padx=3)
+        tk.Button(toolbar, text="Supprimer", bg=COLORS['danger'], fg="white",
+                  command=lambda: self.delete_selected(self.agents_tree, 'agents'),
+                  **btn_opts).pack(side="left", padx=3)
+        
+        # Search
+        tk.Label(toolbar, text="Rechercher :", font=("Segoe UI", 9),
+                 bg=COLORS['toolbar_bg']).pack(side="left", padx=(15, 4))
+        self.agent_search_var = tk.StringVar()
+        tk.Entry(toolbar, textvariable=self.agent_search_var, width=20,
+                 font=("Segoe UI", 9), relief="solid", bd=1).pack(side="left", padx=3)
+        self.agent_search_var.trace_add("write", lambda *a: self._filter_agents())
         
         # Inline form
-        form_frame = tk.LabelFrame(frame, text="Add New Agent Agréé", padx=10, pady=5)
-        form_frame.pack(fill="x", padx=5, pady=5)
+        form = tk.LabelFrame(frame, text="  Ajouter un nouvel Agent Agréé  ",
+                              font=("Segoe UI", 9, "bold"), bg=COLORS['card_bg'],
+                              fg=COLORS['primary'], padx=10, pady=5)
+        form.pack(fill="x", padx=5, pady=4)
         
-        tk.Label(form_frame, text="Nom et Prénom:").grid(row=0, column=0, sticky="e", padx=5, pady=2)
-        self.agent_nom_entry = tk.Entry(form_frame, width=25)
+        lbl_opts = {"font": ("Segoe UI", 9), "bg": COLORS['card_bg']}
+        tk.Label(form, text="Nom et Prénom :", **lbl_opts).grid(row=0, column=0, sticky="e", padx=5, pady=2)
+        self.agent_nom_entry = tk.Entry(form, width=25, font=("Segoe UI", 9), relief="solid", bd=1)
         self.agent_nom_entry.grid(row=0, column=1, padx=5, pady=2)
         
-        tk.Label(form_frame, text="Téléphone:").grid(row=0, column=2, sticky="e", padx=5, pady=2)
-        self.agent_tel_entry = tk.Entry(form_frame, width=18)
+        tk.Label(form, text="Téléphone :", **lbl_opts).grid(row=0, column=2, sticky="e", padx=5, pady=2)
+        self.agent_tel_entry = tk.Entry(form, width=18, font=("Segoe UI", 9), relief="solid", bd=1)
         self.agent_tel_entry.grid(row=0, column=3, padx=5, pady=2)
         
-        tk.Label(form_frame, text="Wilaya:").grid(row=1, column=0, sticky="e", padx=5, pady=2)
-        self.agent_wilaya_entry = tk.Entry(form_frame, width=25)
+        tk.Label(form, text="Wilaya :", **lbl_opts).grid(row=1, column=0, sticky="e", padx=5, pady=2)
+        self.agent_wilaya_entry = tk.Entry(form, width=25, font=("Segoe UI", 9), relief="solid", bd=1)
         self.agent_wilaya_entry.grid(row=1, column=1, padx=5, pady=2)
         
-        tk.Label(form_frame, text="Adresse:").grid(row=1, column=2, sticky="e", padx=5, pady=2)
-        self.agent_adresse_entry = tk.Entry(form_frame, width=18)
+        tk.Label(form, text="Adresse :", **lbl_opts).grid(row=1, column=2, sticky="e", padx=5, pady=2)
+        self.agent_adresse_entry = tk.Entry(form, width=18, font=("Segoe UI", 9), relief="solid", bd=1)
         self.agent_adresse_entry.grid(row=1, column=3, padx=5, pady=2)
         
-        tk.Button(form_frame, text="+ Add", bg="#4CAF50", fg="white",
+        tk.Button(form, text="+ Ajouter", bg=COLORS['success'], fg="white",
+                  font=("Segoe UI", 9), relief="flat", cursor="hand2",
                   command=self.add_agent_from_form).grid(row=0, column=4, rowspan=2, padx=10, pady=2)
         
         # Tree
         self.agents_tree = ttk.Treeview(
-            frame,
-            columns=('ID', 'Nom Prénom', 'Téléphone', 'Wilaya', 'Adresse'),
-            show='headings'
-        )
+            frame, columns=('ID', 'Nom Prénom', 'Téléphone', 'Wilaya', 'Adresse'),
+            show='headings')
         self.agents_tree.heading('ID', text='ID')
         self.agents_tree.heading('Nom Prénom', text='Nom et Prénom')
         self.agents_tree.heading('Téléphone', text='Téléphone')
@@ -271,25 +244,39 @@ class AdminPanel:
         
         for a in self.ref_data.get('agents', []):
             self.agents_tree.insert('', 'end', values=(
-                a['id'], a['nom_prenom'], a['telephone'], a['wilaya'], a['adresse']
-            ))
+                a['id'], a['nom_prenom'], a['telephone'], a['wilaya'], a['adresse']))
+    
+    def _filter_agents(self):
+        query = self.agent_search_var.get().strip().lower()
+        for child in self.agents_tree.get_children():
+            self.agents_tree.delete(child)
+        for a in self.ref_data.get('agents', []):
+            row = f"{a['id']} {a['nom_prenom']} {a['telephone']} {a['wilaya']} {a['adresse']}".lower()
+            if not query or query in row:
+                self.agents_tree.insert('', 'end', values=(
+                    a['id'], a['nom_prenom'], a['telephone'], a['wilaya'], a['adresse']))
     
     # ---- Users Tab ----
     def create_users_tab(self, notebook):
-        frame = tk.Frame(notebook)
-        notebook.add(frame, text="Users")
+        frame = tk.Frame(notebook, bg=COLORS['card_bg'])
+        notebook.add(frame, text="Utilisateurs")
         
-        toolbar = tk.Frame(frame)
-        toolbar.pack(fill="x", padx=5, pady=5)
+        toolbar = tk.Frame(frame, bg=COLORS['toolbar_bg'])
+        toolbar.pack(fill="x", padx=5, pady=4)
         
-        tk.Button(toolbar, text="Add User", command=self.add_user).pack(side="left", padx=2)
-        tk.Button(toolbar, text="Reset Password", command=self.reset_password).pack(side="left", padx=2)
-        tk.Button(toolbar, text="Delete", command=lambda: self.delete_selected(self.users_tree, 'users')).pack(side="left", padx=2)
+        btn_opts = {"font": ("Segoe UI", 9), "relief": "flat", "cursor": "hand2"}
+        tk.Button(toolbar, text="+ Ajouter Utilisateur", bg=COLORS['success'], fg="white",
+                  command=self.add_user, **btn_opts).pack(side="left", padx=3)
+        tk.Button(toolbar, text="Réinitialiser Mot de passe", bg=COLORS['warning'], fg="white",
+                  command=self.reset_password, **btn_opts).pack(side="left", padx=3)
+        tk.Button(toolbar, text="Supprimer", bg=COLORS['danger'], fg="white",
+                  command=lambda: self.delete_selected(self.users_tree, 'users'),
+                  **btn_opts).pack(side="left", padx=3)
         
-        self.users_tree = ttk.Treeview(frame, columns=('ID', 'Username', 'Role'), show='headings')
+        self.users_tree = ttk.Treeview(frame, columns=('ID', 'Nom d\'utilisateur', 'Rôle'), show='headings')
         self.users_tree.heading('ID', text='ID')
-        self.users_tree.heading('Username', text='Username')
-        self.users_tree.heading('Role', text='Role')
+        self.users_tree.heading('Nom d\'utilisateur', text="Nom d'utilisateur")
+        self.users_tree.heading('Rôle', text='Rôle')
         self.users_tree.pack(fill="both", expand=True, padx=5, pady=5)
         
         for u in self.ref_data.get('users', []):
@@ -297,186 +284,172 @@ class AdminPanel:
     
     # ---- Import Data Tab ----
     def create_import_tab(self, notebook):
-        """Tab for bulk Excel data import"""
-        frame = tk.Frame(notebook)
-        notebook.add(frame, text="Import Data")
+        frame = tk.Frame(notebook, bg=COLORS['card_bg'])
+        notebook.add(frame, text="Importer Données")
         
-        # Reference data import
-        info_frame = tk.LabelFrame(frame, text="Import Reference Data from Excel", padx=15, pady=10)
-        info_frame.pack(fill="x", padx=10, pady=10)
+        # Reference data
+        info = tk.LabelFrame(frame, text="  Importer les données de référence depuis Excel  ",
+                              font=("Segoe UI", 10, "bold"), bg=COLORS['card_bg'],
+                              fg=COLORS['primary'], padx=15, pady=10)
+        info.pack(fill="x", padx=10, pady=10)
         
-        tk.Label(info_frame, text=(
-            "Import data from an Excel file with matching sheet structure.\n"
-            "The Excel file can contain any of these sheets:\n"
-            "  Familles (ID, Famille)  |  Produits (ID, Famille_ID, Produit)\n"
-            "  Models (ID, Produit_ID, Model)  |  Pannes (ID, Code, Produit_ID, Panne)\n"
-            "  Causes (ID, Code, Panne_ID, Cause)  |  Solutions (ID, Code, Cause_ID, Solution)\n"
-            "  PDR (ID, Code, PDR)  |  Centres (ID, Centre)\n"
-            "  Agents (ID, Nom_Prenom, Telephone, Wilaya, Adresse)\n\n"
-            "Data will be merged into existing data with new auto-generated IDs."
-        ), font=("Arial", 10), justify="left").pack(anchor="w")
+        tk.Label(info, text=(
+            "Importez des données depuis un fichier Excel avec la structure correspondante.\n"
+            "Le fichier peut contenir ces feuilles :\n"
+            "  Familles | Produits | Modèles | Pannes | Causes | Solutions\n"
+            "  PDR | Centres | Agents\n\n"
+            "Les données seront fusionnées avec les données existantes."
+        ), font=("Segoe UI", 10), justify="left", bg=COLORS['card_bg']).pack(anchor="w")
         
-        tk.Button(
-            info_frame,
-            text="Select Excel File & Import All Data",
-            font=("Arial", 11, "bold"),
-            bg="#2196F3", fg="white",
-            command=self.import_reference_excel
-        ).pack(pady=10)
+        tk.Button(info, text="Sélectionner un fichier Excel et importer",
+                  font=("Segoe UI", 11, "bold"), bg=COLORS['primary'], fg="white",
+                  relief="flat", cursor="hand2",
+                  command=self.import_reference_excel).pack(pady=10)
         
         # Agents import
-        agents_frame = tk.LabelFrame(frame, text="Import Agents Agréés from Excel", padx=15, pady=10)
-        agents_frame.pack(fill="x", padx=10, pady=10)
+        ag = tk.LabelFrame(frame, text="  Importer les Agents Agréés depuis Excel  ",
+                            font=("Segoe UI", 10, "bold"), bg=COLORS['card_bg'],
+                            fg=COLORS['primary'], padx=15, pady=10)
+        ag.pack(fill="x", padx=10, pady=10)
         
-        tk.Label(agents_frame, text=(
-            "Import agents from a simple Excel file with columns:\n"
+        tk.Label(ag, text=(
+            "Importez les agents depuis un fichier Excel avec les colonnes :\n"
             "  Nom_Prenom | Telephone | Wilaya | Adresse\n"
-            "(First row should be a header row)"
-        ), font=("Arial", 10), justify="left").pack(anchor="w")
+            "(La première ligne doit être l'en-tête)"
+        ), font=("Segoe UI", 10), justify="left", bg=COLORS['card_bg']).pack(anchor="w")
         
-        tk.Button(
-            agents_frame,
-            text="Select Excel File & Import Agents",
-            font=("Arial", 11, "bold"),
-            bg="#FF9800", fg="white",
-            command=self.import_agents_excel
-        ).pack(pady=10)
+        tk.Button(ag, text="Sélectionner un fichier Excel et importer les agents",
+                  font=("Segoe UI", 11, "bold"), bg=COLORS['warning'], fg="white",
+                  relief="flat", cursor="hand2",
+                  command=self.import_agents_excel).pack(pady=10)
         
-        # Status log
-        self.import_status = tk.Text(frame, height=8, state="disabled", font=("Courier", 9))
+        # Log
+        self.import_status = tk.Text(frame, height=6, state="disabled",
+                                      font=("Consolas", 9), bg="#FAFAFA")
         self.import_status.pack(fill="both", expand=True, padx=10, pady=5)
     
     # ---- Archives Tab ----
     def create_archives_tab(self, notebook):
-        """Tab for importing and viewing previous monthly reports"""
-        frame = tk.Frame(notebook)
+        frame = tk.Frame(notebook, bg=COLORS['card_bg'])
         notebook.add(frame, text="Archives")
         
-        toolbar = tk.Frame(frame)
-        toolbar.pack(fill="x", padx=5, pady=5)
+        toolbar = tk.Frame(frame, bg=COLORS['toolbar_bg'])
+        toolbar.pack(fill="x", padx=5, pady=4)
         
-        tk.Button(toolbar, text="Import Report to Archive", bg="#2196F3", fg="white",
-                  command=self.import_archive).pack(side="left", padx=5)
-        tk.Button(toolbar, text="Refresh", command=self.refresh_archives).pack(side="left", padx=5)
-        tk.Button(toolbar, text="View Selected", command=self.view_archive).pack(side="left", padx=5)
+        btn_opts = {"font": ("Segoe UI", 9), "relief": "flat", "cursor": "hand2"}
+        tk.Button(toolbar, text="Importer un rapport dans les archives",
+                  bg=COLORS['primary'], fg="white", command=self.import_archive,
+                  **btn_opts).pack(side="left", padx=5)
+        tk.Button(toolbar, text="Actualiser", command=self.refresh_archives,
+                  **btn_opts).pack(side="left", padx=5)
+        tk.Button(toolbar, text="Voir le rapport sélectionné", command=self.view_archive,
+                  **btn_opts).pack(side="left", padx=5)
         
-        # Archives list
-        self.archives_tree = ttk.Treeview(frame, columns=('Filename', 'Date', 'Size'), show='headings')
-        self.archives_tree.heading('Filename', text='Filename')
+        self.archives_tree = ttk.Treeview(frame, columns=('Fichier', 'Date', 'Taille'), show='headings')
+        self.archives_tree.heading('Fichier', text='Nom du fichier')
         self.archives_tree.heading('Date', text='Date')
-        self.archives_tree.heading('Size', text='Size')
-        self.archives_tree.column('Filename', width=350)
+        self.archives_tree.heading('Taille', text='Taille')
+        self.archives_tree.column('Fichier', width=350)
         self.archives_tree.column('Date', width=150)
-        self.archives_tree.column('Size', width=100)
+        self.archives_tree.column('Taille', width=100)
         self.archives_tree.pack(fill="x", padx=5, pady=5)
         
-        # Preview area
-        tk.Label(frame, text="Archive Preview:", font=("Arial", 10, "bold"), anchor="w").pack(fill="x", padx=5)
+        tk.Label(frame, text="Aperçu de l'archive :", font=("Segoe UI", 10, "bold"),
+                 anchor="w", bg=COLORS['card_bg']).pack(fill="x", padx=5)
         
-        preview_frame = tk.Frame(frame)
-        preview_frame.pack(fill="both", expand=True, padx=5, pady=5)
-        
-        scroll_y = ttk.Scrollbar(preview_frame)
-        scroll_y.pack(side="right", fill="y")
-        scroll_x = ttk.Scrollbar(preview_frame, orient="horizontal")
-        scroll_x.pack(side="bottom", fill="x")
-        
-        self.archive_preview_tree = ttk.Treeview(
-            preview_frame, yscrollcommand=scroll_y.set, xscrollcommand=scroll_x.set
-        )
+        pf = tk.Frame(frame, bg=COLORS['card_bg'])
+        pf.pack(fill="both", expand=True, padx=5, pady=5)
+        sy = ttk.Scrollbar(pf); sy.pack(side="right", fill="y")
+        sx = ttk.Scrollbar(pf, orient="horizontal"); sx.pack(side="bottom", fill="x")
+        self.archive_preview_tree = ttk.Treeview(pf, yscrollcommand=sy.set, xscrollcommand=sx.set)
         self.archive_preview_tree.pack(fill="both", expand=True)
-        scroll_y.config(command=self.archive_preview_tree.yview)
-        scroll_x.config(command=self.archive_preview_tree.xview)
+        sy.config(command=self.archive_preview_tree.yview)
+        sx.config(command=self.archive_preview_tree.xview)
         
-        columns = ('#', 'Client', 'Produit', 'Type', 'N° série', 'Garantie',
-                   'Date prod.', 'Panne', 'Réparation', 'PDR', 'Statut',
-                   'Centre', 'Date réc.', 'Date rép.')
-        self.archive_preview_tree['columns'] = columns
+        cols = ('#', 'Client', 'Produit', 'Type', 'N° série', 'Garantie',
+                'Date prod.', 'Panne', 'Réparation', 'PDR', 'Statut',
+                'Centre', 'Date réc.', 'Date rép.')
+        self.archive_preview_tree['columns'] = cols
         self.archive_preview_tree['show'] = 'headings'
-        for col in columns:
-            self.archive_preview_tree.heading(col, text=col)
-            self.archive_preview_tree.column(col, width=90)
+        for c in cols:
+            self.archive_preview_tree.heading(c, text=c)
+            self.archive_preview_tree.column(c, width=90)
         
         self.refresh_archives()
     
-    # ==============================================================
-    # CRUD Actions
-    # ==============================================================
+    # ============ CRUD ============
     
     def add_famille(self):
-        name = simpledialog.askstring("Add Famille", "Enter famille name:")
+        name = simpledialog.askstring("Ajouter Famille", "Nom de la famille :")
         if name:
             new_id = max([f['id'] for f in self.ref_data['familles']], default=0) + 1
             self.ref_data['familles'].append({'id': new_id, 'famille': name})
             self.familles_tree.insert('', 'end', values=(new_id, name))
     
     def add_produit(self):
-        famille_id = simpledialog.askinteger("Add Produit", "Enter Famille ID:")
-        if famille_id:
-            name = simpledialog.askstring("Add Produit", "Enter produit name:")
+        fid = simpledialog.askinteger("Ajouter Produit", "ID de la famille :")
+        if fid:
+            name = simpledialog.askstring("Ajouter Produit", "Nom du produit :")
             if name:
                 new_id = max([p['id'] for p in self.ref_data['produits']], default=0) + 1
-                self.ref_data['produits'].append({'id': new_id, 'famille_id': famille_id, 'produit': name})
-                self.produits_tree.insert('', 'end', values=(new_id, famille_id, name))
+                self.ref_data['produits'].append({'id': new_id, 'famille_id': fid, 'produit': name})
+                self.produits_tree.insert('', 'end', values=(new_id, fid, name))
     
     def add_model(self):
-        produit_id = simpledialog.askinteger("Add Model", "Enter Produit ID:")
-        if produit_id:
-            name = simpledialog.askstring("Add Model", "Enter model name:")
+        pid = simpledialog.askinteger("Ajouter Modèle", "ID du produit :")
+        if pid:
+            name = simpledialog.askstring("Ajouter Modèle", "Nom du modèle :")
             if name:
                 new_id = max([m['id'] for m in self.ref_data['models']], default=0) + 1
-                self.ref_data['models'].append({'id': new_id, 'produit_id': produit_id, 'model': name})
-                self.models_tree.insert('', 'end', values=(new_id, produit_id, name))
+                self.ref_data['models'].append({'id': new_id, 'produit_id': pid, 'model': name})
+                self.models_tree.insert('', 'end', values=(new_id, pid, name))
     
     def add_panne(self):
-        produit_id = simpledialog.askinteger("Add Panne", "Enter Produit ID:")
-        if produit_id:
-            code = simpledialog.askstring("Add Panne", "Enter panne code:")
+        pid = simpledialog.askinteger("Ajouter Panne", "ID du produit :")
+        if pid:
+            code = simpledialog.askstring("Ajouter Panne", "Code de la panne :")
             if code:
-                name = simpledialog.askstring("Add Panne", "Enter panne name:")
+                name = simpledialog.askstring("Ajouter Panne", "Nom de la panne :")
                 if name:
                     new_id = max([p['id'] for p in self.ref_data['pannes']], default=0) + 1
-                    self.ref_data['pannes'].append({'id': new_id, 'code': code, 'produit_id': produit_id, 'panne': name})
-                    self.pannes_tree.insert('', 'end', values=(new_id, code, produit_id, name))
+                    self.ref_data['pannes'].append({'id': new_id, 'code': code, 'produit_id': pid, 'panne': name})
+                    self.pannes_tree.insert('', 'end', values=(new_id, code, pid, name))
     
     def add_cause(self):
-        panne_id = simpledialog.askinteger("Add Cause", "Enter Panne ID:")
-        if panne_id:
-            code = simpledialog.askstring("Add Cause", "Enter cause code:")
+        pid = simpledialog.askinteger("Ajouter Cause", "ID de la panne :")
+        if pid:
+            code = simpledialog.askstring("Ajouter Cause", "Code de la cause :")
             if code:
-                name = simpledialog.askstring("Add Cause", "Enter cause name:")
+                name = simpledialog.askstring("Ajouter Cause", "Nom de la cause :")
                 if name:
                     new_id = max([c['id'] for c in self.ref_data['causes']], default=0) + 1
-                    self.ref_data['causes'].append({'id': new_id, 'code': code, 'panne_id': panne_id, 'cause': name})
-                    self.causes_tree.insert('', 'end', values=(new_id, code, panne_id, name))
+                    self.ref_data['causes'].append({'id': new_id, 'code': code, 'panne_id': pid, 'cause': name})
+                    self.causes_tree.insert('', 'end', values=(new_id, code, pid, name))
     
     def add_solution(self):
-        cause_id = simpledialog.askinteger("Add Solution", "Enter Cause ID:")
-        if cause_id:
-            code = simpledialog.askstring("Add Solution", "Enter solution code:")
+        cid = simpledialog.askinteger("Ajouter Solution", "ID de la cause :")
+        if cid:
+            code = simpledialog.askstring("Ajouter Solution", "Code de la solution :")
             if code:
-                name = simpledialog.askstring("Add Solution", "Enter solution name:")
+                name = simpledialog.askstring("Ajouter Solution", "Nom de la solution :")
                 if name:
                     new_id = max([s['id'] for s in self.ref_data['solutions']], default=0) + 1
-                    self.ref_data['solutions'].append({'id': new_id, 'code': code, 'cause_id': cause_id, 'solution': name})
-                    self.solutions_tree.insert('', 'end', values=(new_id, code, cause_id, name))
+                    self.ref_data['solutions'].append({'id': new_id, 'code': code, 'cause_id': cid, 'solution': name})
+                    self.solutions_tree.insert('', 'end', values=(new_id, code, cid, name))
     
     def add_centre(self):
-        """Add new centre (just the name)"""
-        name = simpledialog.askstring("Add Centre", "Enter centre name (e.g. Centre BBA):")
+        name = simpledialog.askstring("Ajouter Centre", "Nom du centre (ex. Centre BBA) :")
         if name:
             new_id = max([c['id'] for c in self.ref_data['centres']], default=0) + 1
             self.ref_data['centres'].append({'id': new_id, 'centre': name})
             self.centres_tree.insert('', 'end', values=(new_id, name))
     
     def add_agent(self):
-        """Add new agent agréé via dialog prompts"""
-        nom = simpledialog.askstring("Add Agent Agréé", "Nom et Prénom:")
+        nom = simpledialog.askstring("Ajouter Agent Agréé", "Nom et Prénom :")
         if nom:
-            tel = simpledialog.askstring("Add Agent Agréé", "Téléphone:") or ''
-            wilaya = simpledialog.askstring("Add Agent Agréé", "Wilaya:") or ''
-            adresse = simpledialog.askstring("Add Agent Agréé", "Adresse:") or ''
-            
+            tel = simpledialog.askstring("Ajouter Agent Agréé", "Téléphone :") or ''
+            wilaya = simpledialog.askstring("Ajouter Agent Agréé", "Wilaya :") or ''
+            adresse = simpledialog.askstring("Ajouter Agent Agréé", "Adresse :") or ''
             new_id = max([a['id'] for a in self.ref_data.get('agents', [])], default=0) + 1
             new_agent = {'id': new_id, 'nom_prenom': nom, 'telephone': tel, 'wilaya': wilaya, 'adresse': adresse}
             if 'agents' not in self.ref_data:
@@ -485,35 +458,30 @@ class AdminPanel:
             self.agents_tree.insert('', 'end', values=(new_id, nom, tel, wilaya, adresse))
     
     def add_agent_from_form(self):
-        """Add agent from the inline form fields"""
         nom = self.agent_nom_entry.get().strip()
         if not nom:
-            messagebox.showwarning("Warning", "Nom et Prénom is required")
+            messagebox.showwarning("Attention", "Le champ Nom et Prénom est obligatoire")
             return
-        
         tel = self.agent_tel_entry.get().strip()
         wilaya = self.agent_wilaya_entry.get().strip()
         adresse = self.agent_adresse_entry.get().strip()
-        
         new_id = max([a['id'] for a in self.ref_data.get('agents', [])], default=0) + 1
         new_agent = {'id': new_id, 'nom_prenom': nom, 'telephone': tel, 'wilaya': wilaya, 'adresse': adresse}
         if 'agents' not in self.ref_data:
             self.ref_data['agents'] = []
         self.ref_data['agents'].append(new_agent)
         self.agents_tree.insert('', 'end', values=(new_id, nom, tel, wilaya, adresse))
-        
-        # Clear form
         self.agent_nom_entry.delete(0, tk.END)
         self.agent_tel_entry.delete(0, tk.END)
         self.agent_wilaya_entry.delete(0, tk.END)
         self.agent_adresse_entry.delete(0, tk.END)
     
     def add_user(self):
-        username = simpledialog.askstring("Add User", "Enter username:")
+        username = simpledialog.askstring("Ajouter Utilisateur", "Nom d'utilisateur :")
         if username:
-            password = simpledialog.askstring("Add User", "Enter password:")
+            password = simpledialog.askstring("Ajouter Utilisateur", "Mot de passe :")
             if password:
-                role = simpledialog.askstring("Add User", "Enter role (admin/inserter):")
+                role = simpledialog.askstring("Ajouter Utilisateur", "Rôle (admin/inserter) :")
                 if role in ['admin', 'inserter']:
                     new_id = max([u['id'] for u in self.ref_data['users']], default=0) + 1
                     self.ref_data['users'].append({'id': new_id, 'username': username, 'password': password, 'role': role})
@@ -522,24 +490,24 @@ class AdminPanel:
     def reset_password(self):
         selection = self.users_tree.selection()
         if not selection:
-            messagebox.showwarning("Warning", "Please select a user")
+            messagebox.showwarning("Attention", "Veuillez sélectionner un utilisateur")
             return
         item = self.users_tree.item(selection[0])
         user_id = item['values'][0]
-        new_password = simpledialog.askstring("Reset Password", "Enter new password:")
-        if new_password:
+        new_pw = simpledialog.askstring("Réinitialiser Mot de passe", "Nouveau mot de passe :")
+        if new_pw:
             for user in self.ref_data['users']:
                 if user['id'] == user_id:
-                    user['password'] = new_password
-                    messagebox.showinfo("Success", "Password reset successfully")
+                    user['password'] = new_pw
+                    messagebox.showinfo("Succès", "Mot de passe réinitialisé avec succès")
                     break
     
     def delete_selected(self, tree, data_key):
         selection = tree.selection()
         if not selection:
-            messagebox.showwarning("Warning", "Please select an item to delete")
+            messagebox.showwarning("Attention", "Veuillez sélectionner un élément à supprimer")
             return
-        if messagebox.askyesno("Confirm", "Are you sure you want to delete this item?"):
+        if messagebox.askyesno("Confirmer", "Êtes-vous sûr de vouloir supprimer cet élément ?"):
             item = tree.item(selection[0])
             item_id = item['values'][0]
             self.ref_data[data_key] = [x for x in self.ref_data[data_key] if x['id'] != item_id]
@@ -548,13 +516,11 @@ class AdminPanel:
     def save_changes(self):
         try:
             self.excel_mgr.save_reference_data(self.ref_data)
-            messagebox.showinfo("Success", "Changes saved successfully!")
+            messagebox.showinfo("Succès", "Modifications sauvegardées avec succès !")
         except Exception as e:
-            messagebox.showerror("Error", f"Failed to save changes: {str(e)}")
+            messagebox.showerror("Erreur", f"Échec de la sauvegarde : {str(e)}")
     
-    # ==============================================================
-    # Import Actions
-    # ==============================================================
+    # ============ Import ============
     
     def _log_import(self, message):
         self.import_status.config(state="normal")
@@ -563,149 +529,119 @@ class AdminPanel:
         self.import_status.config(state="disabled")
     
     def import_reference_excel(self):
-        """Import reference data from Excel file"""
         file_path = filedialog.askopenfilename(
-            title="Select Reference Data Excel File",
-            filetypes=[("Excel files", "*.xlsx *.xls")]
-        )
+            title="Sélectionner le fichier Excel de données",
+            filetypes=[("Fichiers Excel", "*.xlsx *.xls")])
         if not file_path:
             return
-        
-        self._log_import(f"Importing from: {file_path}")
-        success, message = self.excel_mgr.import_reference_from_excel(file_path)
-        self._log_import(message)
-        
+        self._log_import(f"Importation depuis : {file_path}")
+        success, msg = self.excel_mgr.import_reference_from_excel(file_path)
+        self._log_import(msg)
         if success:
             self.ref_data = self.excel_mgr.load_reference_data()
             self._refresh_all_trees()
-            messagebox.showinfo("Import Success", message)
+            messagebox.showinfo("Importation réussie", msg)
         else:
-            messagebox.showerror("Import Error", message)
+            messagebox.showerror("Erreur d'importation", msg)
     
     def import_agents_excel(self):
-        """Import agents agréés from Excel file"""
         file_path = filedialog.askopenfilename(
-            title="Select Agents Agréés Excel File",
-            filetypes=[("Excel files", "*.xlsx *.xls")]
-        )
+            title="Sélectionner le fichier Excel des Agents Agréés",
+            filetypes=[("Fichiers Excel", "*.xlsx *.xls")])
         if not file_path:
             return
-        
         if hasattr(self, 'import_status'):
-            self._log_import(f"Importing agents from: {file_path}")
-        
-        success, message = self.excel_mgr.import_agents_from_excel(file_path)
-        
+            self._log_import(f"Importation des agents depuis : {file_path}")
+        success, msg = self.excel_mgr.import_agents_from_excel(file_path)
         if hasattr(self, 'import_status'):
-            self._log_import(message)
-        
+            self._log_import(msg)
         if success:
             self.ref_data = self.excel_mgr.load_reference_data()
             self._refresh_agents_tree()
-            messagebox.showinfo("Import Success", message)
+            messagebox.showinfo("Importation réussie", msg)
         else:
-            messagebox.showerror("Import Error", message)
+            messagebox.showerror("Erreur d'importation", msg)
     
     def _refresh_all_trees(self):
-        """Refresh all treeview widgets after data reload"""
-        for item in self.familles_tree.get_children():
-            self.familles_tree.delete(item)
+        for item in self.familles_tree.get_children(): self.familles_tree.delete(item)
         for f in self.ref_data.get('familles', []):
             self.familles_tree.insert('', 'end', values=(f['id'], f['famille']))
         
-        for item in self.produits_tree.get_children():
-            self.produits_tree.delete(item)
+        for item in self.produits_tree.get_children(): self.produits_tree.delete(item)
         for p in self.ref_data.get('produits', []):
             self.produits_tree.insert('', 'end', values=(p['id'], p['famille_id'], p['produit']))
         
-        for item in self.models_tree.get_children():
-            self.models_tree.delete(item)
+        for item in self.models_tree.get_children(): self.models_tree.delete(item)
         for m in self.ref_data.get('models', []):
             self.models_tree.insert('', 'end', values=(m['id'], m['produit_id'], m['model']))
         
-        for item in self.pannes_tree.get_children():
-            self.pannes_tree.delete(item)
+        for item in self.pannes_tree.get_children(): self.pannes_tree.delete(item)
         for p in self.ref_data.get('pannes', []):
             self.pannes_tree.insert('', 'end', values=(p['id'], p['code'], p['produit_id'], p['panne']))
         
-        for item in self.causes_tree.get_children():
-            self.causes_tree.delete(item)
+        for item in self.causes_tree.get_children(): self.causes_tree.delete(item)
         for c in self.ref_data.get('causes', []):
             self.causes_tree.insert('', 'end', values=(c['id'], c['code'], c['panne_id'], c['cause']))
         
-        for item in self.solutions_tree.get_children():
-            self.solutions_tree.delete(item)
+        for item in self.solutions_tree.get_children(): self.solutions_tree.delete(item)
         for s in self.ref_data.get('solutions', []):
             self.solutions_tree.insert('', 'end', values=(s['id'], s['code'], s['cause_id'], s['solution']))
         
-        for item in self.centres_tree.get_children():
-            self.centres_tree.delete(item)
+        for item in self.centres_tree.get_children(): self.centres_tree.delete(item)
         for c in self.ref_data.get('centres', []):
             self.centres_tree.insert('', 'end', values=(c['id'], c['centre']))
         
         self._refresh_agents_tree()
         
-        for item in self.users_tree.get_children():
-            self.users_tree.delete(item)
+        for item in self.users_tree.get_children(): self.users_tree.delete(item)
         for u in self.ref_data.get('users', []):
             self.users_tree.insert('', 'end', values=(u['id'], u['username'], u['role']))
     
     def _refresh_agents_tree(self):
-        for item in self.agents_tree.get_children():
-            self.agents_tree.delete(item)
+        for item in self.agents_tree.get_children(): self.agents_tree.delete(item)
         for a in self.ref_data.get('agents', []):
             self.agents_tree.insert('', 'end', values=(
-                a['id'], a['nom_prenom'], a['telephone'], a['wilaya'], a['adresse']
-            ))
+                a['id'], a['nom_prenom'], a['telephone'], a['wilaya'], a['adresse']))
     
-    # ==============================================================
-    # Archive Actions
-    # ==============================================================
+    # ============ Archives ============
     
     def refresh_archives(self):
-        for item in self.archives_tree.get_children():
-            self.archives_tree.delete(item)
+        for item in self.archives_tree.get_children(): self.archives_tree.delete(item)
         for arc in self.excel_mgr.list_archives():
-            size_kb = f"{arc['size'] / 1024:.1f} KB"
+            size_kb = f"{arc['size'] / 1024:.1f} Ko"
             self.archives_tree.insert('', 'end', values=(arc['filename'], arc['date'], size_kb))
     
     def import_archive(self):
         file_path = filedialog.askopenfilename(
-            title="Select Monthly Report to Archive",
-            filetypes=[("Excel files", "*.xlsx *.xls")]
-        )
+            title="Sélectionner le rapport mensuel à archiver",
+            filetypes=[("Fichiers Excel", "*.xlsx *.xls")])
         if not file_path:
             return
-        success, message = self.excel_mgr.import_archive(file_path)
+        success, msg = self.excel_mgr.import_archive(file_path)
         if success:
             self.refresh_archives()
-            messagebox.showinfo("Archive Success", message)
+            messagebox.showinfo("Archivage réussi", msg)
         else:
-            messagebox.showerror("Archive Error", message)
+            messagebox.showerror("Erreur d'archivage", msg)
     
     def view_archive(self):
         selection = self.archives_tree.selection()
         if not selection:
-            messagebox.showwarning("Warning", "Please select an archive to view")
+            messagebox.showwarning("Attention", "Veuillez sélectionner une archive")
             return
-        
         item = self.archives_tree.item(selection[0])
         filename = item['values'][0]
         archive_path = os.path.join(self.excel_mgr.archives_dir, filename)
-        
         for child in self.archive_preview_tree.get_children():
             self.archive_preview_tree.delete(child)
-        
         insertions = self.excel_mgr.load_archive_data(archive_path)
         if not insertions:
-            messagebox.showinfo("Info", "No data found in this archive")
+            messagebox.showinfo("Info", "Aucune donnée trouvée dans cette archive")
             return
-        
         for ins in insertions:
             self.archive_preview_tree.insert('', 'end', values=(
                 ins.get('num', ''), ins.get('client', ''), ins.get('produit', ''),
                 ins.get('type_produit', ''), ins.get('num_serie', ''), ins.get('garantie', ''),
                 ins.get('date_produit', ''), ins.get('panne', ''), ins.get('reparation', ''),
                 ins.get('pdr', ''), ins.get('statut', ''), ins.get('centre', ''),
-                ins.get('date_reception', ''), ins.get('date_reparation', '')
-            ))
+                ins.get('date_reception', ''), ins.get('date_reparation', '')))
