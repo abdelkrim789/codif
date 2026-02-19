@@ -464,9 +464,11 @@ class ExcelManager:
         if os.path.exists(dest):
             base, ext = os.path.splitext(filename)
             counter = 1
-            while os.path.exists(dest):
+            while os.path.exists(dest) and counter < 1000:
                 dest = os.path.join(self.archives_dir, f"{base}_{counter}{ext}")
                 counter += 1
+            if os.path.exists(dest):
+                return False, "Too many copies of this file already archived"
         
         try:
             shutil.copy2(file_path, dest)
