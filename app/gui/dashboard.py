@@ -276,6 +276,10 @@ class Dashboard:
         for item in self.tree.get_children():
             self.tree.delete(item)
         
+        # Reset sort state when filters change
+        self.sort_col = None
+        self.sort_reverse = False
+        
         search = self.search_var.get().strip().lower()
         f_client = self.filter_client_var.get().strip().lower()
         f_serie = self.filter_serie_var.get().strip().lower()

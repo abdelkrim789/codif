@@ -91,7 +91,7 @@ class LoginWindow:
         
         tk.Label(form, text="Mot de passe :", font=("Segoe UI", 10),
                  bg=COLORS['card_bg'], fg=COLORS['text']).grid(row=1, column=0, sticky="e", padx=8, pady=8)
-        self.password_entry = tk.Entry(form, font=("Segoe UI", 11), width=20, show="●",
+        self.password_entry = tk.Entry(form, font=("Segoe UI", 11), width=20, show="*",
                                        relief="solid", bd=1)
         self.password_entry.grid(row=1, column=1, padx=8, pady=8)
         
